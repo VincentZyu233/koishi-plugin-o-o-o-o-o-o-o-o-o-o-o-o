@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-o-o-o-o-o-o-o-o-o-o-o-o",
   "description": "神秘拉珠？打开插件有惊喜喵~",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [

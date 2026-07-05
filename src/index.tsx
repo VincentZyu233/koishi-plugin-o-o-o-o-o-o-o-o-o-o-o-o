@@ -1,9 +1,11 @@
 import { Context, Schema, h } from 'koishi'
-import { } from '@koishijs/plugin-notifier'
+import {} from '@koishijs/plugin-notifier'
 
 export const name = 'o-o-o-o-o-o-o-o-o-o-o-o'
 
-export const inject = ['notifier']
+export const inject = {
+  optional: ['notifier'],
+}
 
 export const reusable = true
 
@@ -14,9 +16,40 @@ export const usage = `---
 
 ---`
 
-export interface Config { }
+export interface Config {
+  modifySendText: boolean
+  separator: string
+  showNotifier: boolean
+  notifierDuration: number
+}
 
-export const Config: Schema<Config> = Schema.object({})
+export const Config: Schema<Config> = Schema.object({
+  modifySendText: Schema.boolean()
+    .description('是否修改机器人发送的文本，在文本元素的每个字符之间插入配置的字符串。')
+    .default(true),
+  separator: Schema.string()
+    .description('修改发送文本时，在每个字符之间插入的字符串。')
+    .default('-'),
+  showNotifier: Schema.boolean()
+    .description('是否使用 notifier 在控制台显示启动文本。')
+    .default(true),
+  notifierDuration: Schema.number()
+    .role('time')
+    .description('notifier 显示时长，单位为毫秒；小于等于 0 表示不自动消失。')
+    .default(700),
+})
+
+function insertSeparatorBetweenChars(elements: h[], separator: string) {
+  for (const el of elements) {
+    if (el.type === 'text' && el.attrs?.content != null) {
+      el.attrs.content = Array.from(String(el.attrs.content)).join(separator)
+    }
+
+    if (el.children?.length) {
+      insertSeparatorBetweenChars(el.children, separator)
+    }
+  }
+}
 
 function buildContent(): h[] {
   return [
@@ -53,16 +86,38 @@ function buildContent(): h[] {
   ]
 }
 
-export async function apply(ctx: Context, _config: Config) {
+export async function apply(ctx: Context, config: Config) {
+  const modifySendText = config.modifySendText ?? true
+  const separator = config.separator ?? '-'
+  const showNotifier = config.showNotifier ?? true
+  const notifierDuration = config.notifierDuration ?? 700
+
+  if (modifySendText) {
+    ctx.on('before-send', (session) => {
+      if (session.elements?.length) {
+        insertSeparatorBetweenChars(session.elements, separator)
+      }
+    })
+  }
+
+  if (!showNotifier || !ctx.notifier) return
+
   const notifier = ctx.notifier.create(buildContent())
+  let disposed = false
+  const disposeNotifier = () => {
+    if (disposed) return
+    disposed = true
+    notifier.dispose()
+  }
+  ctx.on('dispose', disposeNotifier)
+
+  if (notifierDuration <= 0) return
 
   try {
-    await ctx.sleep(0.7 * 1000)
+    await ctx.sleep(notifierDuration)
   } catch {
     return
   }
 
-  notifier.dispose()
-
-  ctx.scope.dispose()
+  disposeNotifier()
 }
